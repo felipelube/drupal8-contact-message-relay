@@ -1,1 +1,4 @@
-Este é um simpels projeto que expõe um endpoint para receber um formulário de contato, fazer a validação dele (inclusive com suporte ao RECaptcha), e encaminhá-lo à API do Drupal como uma mensagem de contato. O objetivo é não expor a API do Drupal diretamente a um site estático e não permitir o uso por robôs de um formulário de contato.
+# Drupal Contact Message Relay
+
+An small API for relaying contact messages from a static page form to Drupal 8, after server-side 
+Recaptcha validation.
