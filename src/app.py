@@ -1,126 +1,61 @@
 from flask import Flask, request, jsonify, make_response, json
+from flask_cors import cross_origin, CORS
 from jsonschema import validate, ValidationError, SchemaError
 from random import choice
-from secrets import recaptcha_site_key, drupal_auth_user, drupal_auth_password, drupal_contact_message_url, drupal_contact_form_id
+
+import secrets
+from exceptions import RecaptchaError, APIException
+from schemas import ContactFormSchema
 
 import requests
 import logging
 import jsend
 
 app = Flask(__name__)
+CORS(app)
 
-class RecaptchaError(Exception):
-  def __init__(self, message, error_codes):
-    super().__init__(message)
-    self.error_codes = error_codes
+def do_recaptcha_validation(secret, response):  
+  with requests.post('https://www.google.com/recaptcha/api/siteverify', data={
+    "secret": secret,
+    "response": response
+  }) as r:
+    r.raise_for_status()
+    if (r.json()['success'] != True):
+      raise RecaptchaError("Non valid Recaptcha", r.error_codes)
 
-contact_form_schema = {
-  "definitions": {}, 
-  "$schema": "http://json-schema.org/draft-04/schema#", 
-  "id": "http://example.com/example.json", 
-  "type": "object", 
-  "properties": {
-    "name": {
-      "id": "/properties/name", 
-      "type": "string", 
-      "title": "The Name Schema.", 
-      "description": "An explanation about the purpose of this instance.", 
-      "default": ""
-    }, 
-    "subject": {
-      "id": "/properties/subject", 
-      "type": "string", 
-      "title": "The Subject Schema.", 
-      "description": "An explanation about the purpose of this instance.", 
-      "default": ""
-    }, 
-    "mail": {
-      "id": "/properties/mail", 
-      "type": "string", 
-      "title": "The Mail Schema.", 
-      "description": "An explanation about the purpose of this instance.", 
-      "default": "",
-      "format": "email"
-    }, 
-    "message": {
-      "id": "/properties/message", 
-      "type": "string", 
-      "title": "The Message Schema.", 
-      "description": "An explanation about the purpose of this instance.", 
-      "default": ""
-    }, 
-    "recaptcha_response": {
-      "id": "/properties/recaptcha_response", 
-      "type": "string", 
-      "title": "The Recaptcha_response Schema.", 
-      "description": "An explanation about the purpose of this instance.", 
-      "default": ""
-    }
-  }, 
-  "required": [
-    "name", 
-    "subject", 
-    "mail", 
-    "message", 
-    "recaptcha_response"
-  ]
-}
+def post_drupal_contact_message(contact, form_id):
+  with requests.post(secrets.drupal_contact_message_url, json={
+    "contact_form": form_id,
+    "message": [contact["message"]],
+    "subject": ["Contato - " + contact["name"]],
+    "mail": [contact["mail"]],
+    "name": [contact["name"]]
+  }, auth=(secrets.drupal_auth_user, secrets.drupal_auth_password)) as r:
+    r.raise_for_status()
+    return r.json()
 
-@app.route('/', methods=['POST', 'GET'])
+@app.route('/', methods=['POST'])
 def handle_form():
-  response = ''  
-  if request.method == 'POST' and request.is_json:
-    received_data = request.get_json()    
-    try:      
-      validate(received_data, contact_form_schema)
-      data_for_recaptcha = {
-        "secret": recaptcha_site_key,
-        "response": received_data["recaptcha_response"]
-        #"remoteip":
-      }
-      r_recaptcha = requests.post('https://www.google.com/recaptcha/api/siteverify', data=data_for_recaptcha)
-      r_recaptcha.raise_for_status();
-      jsondata = r_recaptcha.json();
-      if jsondata["success"] != True:
-        raise RecaptchaError("Google Recaptcha API Error", jsondata["error-codes"]) #API do Google rejeitou
-      else:
-        r_data_for_drupal = {
-          "contact_form": drupal_contact_form_id,
-          "message": [received_data["message"]],
-          "subject": ["Contato"],
-          "mail": [received_data["mail"]],
-          "name": [received_data["name"]]
-        }
-        r_drupal = requests.post(drupal_contact_message_url, json=r_data_for_drupal, auth=(drupal_auth_user, drupal_auth_password))
-        r_drupal.raise_for_status()
-        drupal_json_data = r_drupal.json()
-        response = jsonify(drupal_json_data)
-    except RecaptchaError as e:
-      response = app.response_class(
-        response=json.dumps(jsend.fail({"recaptcha_errors": e.error_codes})),
-        status=400,
-        mimetype='application/json'
-      )
-      logging.exception(e)
-    except ValidationError as e:
-      response = app.response_class(
-        response=json.dumps(jsend.fail({"error": "invalid data"})),
-        status=400,
-        mimetype='application/json'
-      )
-      logging.exception(e)
-    except Exception as e:
-      response = app.response_class(
-        response=json.dumps({"error": "Server Error"}),
-        status=500,
-        mimetype='application/json'
-      )
-      logging.exception(e)
-
-  else:        
+  try:
+    assert request.is_json  
+    received_data = request.get_json()
+    validate(received_data, ContactFormSchema)
+    do_recaptcha_validation(secrets.recaptcha_site_key, received_data["recaptcha_response"])
+    drupal_response = post_drupal_contact_message(received_data, secrets.drupal_contact_form_id)
     response = app.response_class(
-      response=json.dumps({"error": "Hic sunt dracones"}),
-      status=400,
+      response = json.dumps(jsend.success({'data': drupal_response})),
+      status = 201,
       mimetype='application/json'
     )
+    return response
+  except (RecaptchaError, ValidationError, AssertionError) as e:    
+    raise APIException("Falha ao processar")    
+  except Exception as e:
+    raise APIException("Falha no servidor", 500)
+
+@app.errorhandler(APIException)
+def handle_api_exception(error):
+  response = jsonify(error.to_dict())
+  response.status_code = error.status_code
+  logging.exception(error)
   return response
