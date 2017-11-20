@@ -18,7 +18,7 @@ APP.config.from_object('config')
 def do_recaptcha_validation(response):
     ''' Perform a server-side Google ReCaptcha validation '''    
     with requests.post('https://www.google.com/recaptcha/api/siteverify', data={
-        "secret": APP.config["RECAPTCHA_SITE_KEY"],
+        "secret": APP.config["RECAPTCHA_SECRET_KEY"],
         "response": response
     }) as req:
         req.raise_for_status()
