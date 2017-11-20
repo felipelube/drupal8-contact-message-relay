@@ -9,6 +9,10 @@ class RecaptchaError(Exception):
         super().__init__(self)
         self.message = message
         self.error_codes = error_codes
+    
+    def __str__(self):
+        return "{} .\nReturned error codes: {}".format(
+            self.message, self.error_codes)
 
 class APIException(Exception):
     ''' A Generic API Exception '''
