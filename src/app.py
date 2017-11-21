@@ -21,12 +21,14 @@ def do_recaptcha_validation(response):
         "secret": APP.config["RECAPTCHA_SECRET_KEY"],
         "response": response
     }) as req:
-        req.raise_for_status()
-        json_response = req.json()
-        try:            
+        try:
+            req.raise_for_status()
+            json_response = req.json()        
             assert json_response['success'] == True
         except AssertionError:
             raise RecaptchaError("Invalid", json_response['error-codes'])        
+        except requests.exceptions.RequestException:
+            raise APIException("Failed to connect to ReCaptcha Service", 503)
         else:
             return True
 
@@ -39,8 +41,12 @@ def post_drupal_contact_message(contact):
         "mail": [contact["mail"]],
         "name": [contact["name"]]
     }, auth=(app.config["DRUPAL_AUTH_USER"], app.config["DRUPAL_AUTH_PASSWORD"])) as req:
-        req.raise_for_status()
-        return req.json()
+        try:
+            req.raise_for_status()
+        except requests.exceptions.RequestException:
+            raise APIException("Failed to connect to Drupal", 503)
+        else:
+            return req.json()
 
 @APP.route('/', methods=['POST'])
 def handle_form():    
@@ -59,7 +65,7 @@ def handle_form():
         return response
     except (RecaptchaError, ValidationError, AssertionError):
         raise APIException("Invalid captcha or bad request")
-    except Exception:
+    except:
         raise APIException("Server error", 500)
 
 @APP.errorhandler(APIException)
