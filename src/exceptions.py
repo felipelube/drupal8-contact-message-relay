@@ -25,6 +25,9 @@ class APIException(Exception):
             self.status_code = status_code
         self.payload = payload
 
+    def __str__(self):
+        return self.message
+
     def to_dict(self):
         ''' Transforms this exception to a dict '''
         if self.status_code >= 400 and self.status_code < 500:
