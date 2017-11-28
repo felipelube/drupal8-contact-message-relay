@@ -13,6 +13,7 @@ from jsonschema import ValidationError, validate
 from schemas import CONTACT_FORM_SCHEMA
 
 APP = Flask(__name__)
+CORS(APP)
 APP.config.from_object('config')
 
 def do_recaptcha_validation(response):
