@@ -2,3 +2,5 @@ venv/*
 */__pycache__/*
 .vscode/*
 src/config.py
+/node_modules/
+src/config/secrets.js
