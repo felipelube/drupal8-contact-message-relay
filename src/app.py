@@ -35,13 +35,13 @@ def do_recaptcha_validation(response):
 
 def post_drupal_contact_message(contact):
     ''' Post contact message to Drupal '''
-    with requests.post(app.config["DRUPAL_CONTACT_MESSAGE_URL"], json={
+    with requests.post(APP.config["DRUPAL_CONTACT_MESSAGE_URL"], json={
         "contact_form": APP.config["DRUPAL_CONTACT_FORM_ID"],
         "message": [contact["message"]],
         "subject": ["Contato - " + contact["name"]],
         "mail": [contact["mail"]],
         "name": [contact["name"]]
-    }, auth=(app.config["DRUPAL_AUTH_USER"], app.config["DRUPAL_AUTH_PASSWORD"])) as req:
+    }, auth=(APP.config["DRUPAL_AUTH_USER"], APP.config["DRUPAL_AUTH_PASSWORD"])) as req:
         try:
             req.raise_for_status()
         except requests.exceptions.RequestException:
