@@ -8,26 +8,35 @@ import requests
 
 
 from flask import Flask, jsonify, json, request
+from flask_env import MetaFlaskEnv
 from flask_cors import CORS
 from jsonschema import ValidationError, validate
 from schemas import CONTACT_FORM_SCHEMA
 
 APP = Flask(__name__)
 CORS(APP)
-APP.config.from_object('config')
+
+class Configuration(metaclass=MetaFlaskEnv):
+    RECAPTCHA_SECRET_KEY = ''
+    DRUPAL_CONTACT_MESSAGE_URL = ''
+    DRUPAL_CONTACT_FORM_ID = ''
+    DRUPAL_AUTH_USER = ''
+    DRUPAL_AUTH_PASSWORD = ''
+
+APP.config.from_object(Configuration)
 
 def do_recaptcha_validation(response):
-    ''' Perform a server-side Google ReCaptcha validation '''    
+    ''' Perform a server-side Google ReCaptcha validation '''
     with requests.post('https://www.google.com/recaptcha/api/siteverify', data={
         "secret": APP.config["RECAPTCHA_SECRET_KEY"],
         "response": response
     }) as req:
         try:
             req.raise_for_status()
-            json_response = req.json()        
+            json_response = req.json()
             assert json_response['success'] == True
         except AssertionError:
-            raise RecaptchaError("Invalid", json_response['error-codes'])        
+            raise RecaptchaError("Invalid", json_response['error-codes'])
         except requests.exceptions.RequestException:
             raise APIException("Failed to connect to ReCaptcha Service", 503)
         else:
@@ -50,10 +59,10 @@ def post_drupal_contact_message(contact):
             return req.json()
 
 @APP.route('/', methods=['POST'])
-def handle_form():    
+def handle_form():
     ''' Web entrypoint '''
     try:
-        assert request.is_json        
+        assert request.is_json
         received_data = request.get_json()
         validate(received_data, CONTACT_FORM_SCHEMA)
         do_recaptcha_validation(received_data["recaptcha_response"])
