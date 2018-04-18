@@ -10,3 +10,4 @@ Recaptcha validation.
 - RELAY_DRUPAL_CONTACT_FORM_ID: the contact form id
 - RELAY_DRUPAL_AUTH_USER: username allowed to post in the rest endpoint
 - RELAY_DRUPAL_AUTH_PASSWORD: password of the user
+- RELAY_CORS_ORIGINS: origins to allow access via CORS (default is to allow all origins '*')

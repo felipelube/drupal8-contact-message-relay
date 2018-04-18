@@ -9,12 +9,11 @@ import requests
 
 from flask import Flask, jsonify, json, request
 from flask_env import MetaFlaskEnv
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from jsonschema import ValidationError, validate
 from schemas import CONTACT_FORM_SCHEMA
 
 APP = Flask(__name__)
-CORS(APP)
 
 class Configuration(metaclass=MetaFlaskEnv):
     ENV_PREFIX = 'RELAY_'
@@ -24,8 +23,10 @@ class Configuration(metaclass=MetaFlaskEnv):
     DRUPAL_CONTACT_FORM_ID = ''
     DRUPAL_AUTH_USER = ''
     DRUPAL_AUTH_PASSWORD = ''
+    CORS_ORIGINS = "*"
 
 APP.config.from_object(Configuration)
+CORS(app=APP, origins=APP.config['CORS_ORIGINS'])
 
 def do_recaptcha_validation(response):
     ''' Perform a server-side Google ReCaptcha validation '''
