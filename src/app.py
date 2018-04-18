@@ -17,6 +17,8 @@ APP = Flask(__name__)
 CORS(APP)
 
 class Configuration(metaclass=MetaFlaskEnv):
+    ENV_PREFIX = 'RELAY_'
+
     RECAPTCHA_SECRET_KEY = ''
     DRUPAL_CONTACT_MESSAGE_URL = ''
     DRUPAL_CONTACT_FORM_ID = ''
