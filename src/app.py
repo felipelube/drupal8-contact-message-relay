@@ -1,17 +1,17 @@
 '''
 An small API for relaying contact messages to Drupal after server-side Recaptcha validation.
 '''
-import logging
 from exceptions import RecaptchaError, APIException
-import jsend
-import requests
-
-
-from flask import Flask, jsonify, json, request
-from flask_env import MetaFlaskEnv
-from flask_cors import CORS, cross_origin
 from jsonschema import ValidationError, validate
-from schemas import CONTACT_FORM_SCHEMA
+from flask import Flask, jsonify, json, request
+from flask_cors import CORS, cross_origin
+from flask_env import MetaFlaskEnv
+import requests
+import schemas
+import logging
+import jsend
+import sys
+
 
 APP = Flask(__name__)
 
@@ -25,10 +25,19 @@ class Configuration(metaclass=MetaFlaskEnv):
     DRUPAL_AUTH_USER = ''
     DRUPAL_AUTH_PASSWORD = ''
     CORS_ORIGINS = "*"
+    # use the Drupal 8 schema for backwards compatibility
+    SELECTED_SCHEMA = 'CONTACT_FORM_SCHEMA'
 
 
 APP.config.from_object(Configuration)
 CORS(app=APP, origins=APP.config['CORS_ORIGINS'])
+
+# quit early if the user selected schema is not defined in the built-in schemas
+try:
+    SELECTED_SCHEMA = getattr(schemas, APP.config['SELECTED_SCHEMA'])
+except AttributeError:
+    raise ValueError(
+        "The selected schema does not exist in the built-in schemas")
 
 
 def do_recaptcha_validation(response):
