@@ -15,6 +15,7 @@ from schemas import CONTACT_FORM_SCHEMA
 
 APP = Flask(__name__)
 
+
 class Configuration(metaclass=MetaFlaskEnv):
     ENV_PREFIX = 'RELAY_'
 
@@ -25,8 +26,10 @@ class Configuration(metaclass=MetaFlaskEnv):
     DRUPAL_AUTH_PASSWORD = ''
     CORS_ORIGINS = "*"
 
+
 APP.config.from_object(Configuration)
 CORS(app=APP, origins=APP.config['CORS_ORIGINS'])
+
 
 def do_recaptcha_validation(response):
     ''' Perform a server-side Google ReCaptcha validation '''
@@ -37,13 +40,17 @@ def do_recaptcha_validation(response):
         try:
             req.raise_for_status()
             json_response = req.json()
-            assert json_response['success'] == True
-        except AssertionError:
+            if not getattr(json_response, 'success', False):
+                raise ValueError()
+        except ValueError:
             raise RecaptchaError("Invalid", json_response['error-codes'])
         except requests.exceptions.RequestException:
             raise APIException("Failed to connect to ReCaptcha Service", 503)
+        except:
+            raise APIException("Server error", 500)
         else:
             return True
+
 
 def post_drupal_contact_message(contact):
     ''' Post contact message to Drupal '''
@@ -56,16 +63,18 @@ def post_drupal_contact_message(contact):
     }, auth=(APP.config["DRUPAL_AUTH_USER"], APP.config["DRUPAL_AUTH_PASSWORD"])) as req:
         try:
             req.raise_for_status()
-        except requests.exceptions.RequestException:
+        except:
             raise APIException("Failed to connect to Drupal", 503)
         else:
             return req.json()
+
 
 @APP.route('/', methods=['POST'])
 def handle_form():
     ''' Web entrypoint '''
     try:
-        assert request.is_json
+        if not request.is_json:
+            raise ValueError()
         received_data = request.get_json()
         validate(received_data, CONTACT_FORM_SCHEMA)
         do_recaptcha_validation(received_data["recaptcha_response"])
@@ -76,10 +85,11 @@ def handle_form():
             mimetype='application/json'
         )
         return response
-    except (RecaptchaError, ValidationError, AssertionError):
+    except (RecaptchaError, ValidationError, ValueError):
         raise APIException("Invalid captcha or bad request")
     except:
         raise APIException("Server error", 500)
+
 
 @APP.errorhandler(APIException)
 def handle_api_exception(error):
