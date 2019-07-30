@@ -4,3 +4,4 @@ venv/*
 src/config.py
 /node_modules/
 src/config/secrets.js
+.venv/*
